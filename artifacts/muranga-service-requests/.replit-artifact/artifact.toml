@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Murang’a County Public Service Request System"
+description = "A secure public-service portal where Murang’a County residents can report service issues, follow progress, and where authorized county staff manage resolution."
+version = "1.0.0"
+id = "artifacts/muranga-service-requests"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22316
+
+[services.development]
+run = "pnpm --filter @workspace/muranga-service-requests run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/muranga-service-requests", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/muranga-service-requests/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22316"
+BASE_PATH = "/"

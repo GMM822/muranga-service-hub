@@ -10,6 +10,14 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: requests
+    description: Citizen public-service requests and their status history
+  - name: account
+    description: Signed-in user profile
+  - name: analytics
+    description: County request analytics for authorized administrators
+  - name: Storage
+    description: Protected citizen attachment uploads
 paths:
   /healthz:
     get:
@@ -24,6 +32,245 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /me:
+    get:
+      operationId: getMyProfile
+      tags: [account]
+      summary: Get the signed-in user's profile and role
+      responses:
+        "200":
+          description: Signed-in profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /requests:
+    get:
+      operationId: listRequests
+      tags: [requests]
+      summary: List requests visible to the signed-in user
+      description: Citizens see only their own requests. Administrators see all requests, including clearly marked demonstration records.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/RequestStatus"
+        - name: category
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/RequestCategory"
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 120
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: A page of visible service requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestListResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    post:
+      operationId: createRequest
+      tags: [requests]
+      summary: Submit a public-service request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestInput"
+      responses:
+        "201":
+          description: Request submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceRequest"
+        "400":
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /requests/{id}:
+    get:
+      operationId: getRequest
+      tags: [requests]
+      summary: Get request details and status history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Request details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceRequest"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Request belongs to another citizen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Request not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /requests/{id}/status:
+    patch:
+      operationId: updateRequestStatus
+      tags: [requests]
+      summary: Update a request's status (administrator only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestStatusInput"
+      responses:
+        "200":
+          description: Updated request and status history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceRequest"
+        "400":
+          description: Invalid status or note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Administrator access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Request not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /analytics:
+    get:
+      operationId: getAnalytics
+      tags: [analytics]
+      summary: Get county-wide request analytics (administrator only)
+      responses:
+        "200":
+          description: Request totals and category breakdown
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsSummary"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Administrator access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [Storage]
+      summary: Request a protected direct-upload URL
+      description: The authenticated client uploads image bytes directly to object storage using the returned URL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Presigned upload URL and private object path
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
+          description: Invalid or unsupported image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +280,191 @@ components:
           type: string
       required:
         - status
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    UserProfile:
+      type: object
+      properties:
+        userId:
+          type: string
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        role:
+          type: string
+          enum: [citizen, admin]
+      required: [userId, email, fullName, role]
+    RequestStatus:
+      type: string
+      enum: [Pending, "In Progress", Resolved]
+    RequestCategory:
+      type: string
+      enum:
+        - Water Supply
+        - Waste Management
+        - Roads and Transport
+        - Street Lighting
+        - Drainage and Flooding
+        - Other
+    RequestStatusEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          $ref: "#/components/schemas/RequestStatus"
+        note:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedByName:
+          type: string
+      required: [id, status, createdAt, updatedByName]
+    ServiceRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        trackingCode:
+          type: string
+        category:
+          $ref: "#/components/schemas/RequestCategory"
+        location:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: "#/components/schemas/RequestStatus"
+        imagePath:
+          type: [string, "null"]
+        reporterName:
+          type: string
+        reporterEmail:
+          type: string
+          format: email
+        isDemo:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequestStatusEvent"
+      required:
+        - id
+        - trackingCode
+        - category
+        - location
+        - description
+        - status
+        - imagePath
+        - reporterName
+        - reporterEmail
+        - isDemo
+        - createdAt
+        - updatedAt
+        - history
+    RequestInput:
+      type: object
+      properties:
+        category:
+          $ref: "#/components/schemas/RequestCategory"
+        location:
+          type: string
+          minLength: 3
+          maxLength: 240
+        description:
+          type: string
+          minLength: 10
+          maxLength: 4000
+        imagePath:
+          type: [string, "null"]
+          maxLength: 500
+      required: [category, location, description]
+    RequestStatusInput:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/RequestStatus"
+        note:
+          type: [string, "null"]
+          maxLength: 1000
+      required: [status]
+    RequestListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceRequest"
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+      required: [items, total, page, pageSize]
+    CategoryCount:
+      type: object
+      properties:
+        category:
+          $ref: "#/components/schemas/RequestCategory"
+        count:
+          type: integer
+      required: [category, count]
+    AnalyticsSummary:
+      type: object
+      properties:
+        total:
+          type: integer
+        open:
+          type: integer
+        pending:
+          type: integer
+        inProgress:
+          type: integer
+        resolved:
+          type: integer
+        demoTotal:
+          type: integer
+        byCategory:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryCount"
+      required: [total, open, pending, inProgress, resolved, demoTotal, byCategory]
+    UploadUrlRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 180
+        size:
+          type: integer
+          minimum: 1
+          maximum: 5242880
+        contentType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+      required: [name, size, contentType]
+    UploadUrlResponse:
+      type: object
+      properties:
+        uploadURL:
+          type: string
+          format: uri
+        objectPath:
+          type: string
+      required: [uploadURL, objectPath]
 
